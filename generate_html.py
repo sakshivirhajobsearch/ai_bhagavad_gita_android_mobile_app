@@ -11,21 +11,31 @@ OUTPUT_HTML = os.path.join(
 SHLOKAS_PER_PAGE = 2
 
 
+# ---------------------------------------------------------
+# FIXED: Works with your SECTION format
+# ---------------------------------------------------------
 def flatten_sections(all_sections):
     flat = []
     for sec in all_sections:
-        if isinstance(sec, list):
-            sec = sec[0]
-        title = sec.get("title", "")
-        for s in sec.get("shlokas", []):
-            flat.append({
-                "section": title,
-                "problem": s.get("problem", ""),
-                "reference": s.get("reference", ""),
-                "text": s.get("text", ""),
-                "meaning": s.get("meaning", ""),
-                "example": s.get("example", "")
-            })
+        if not isinstance(sec, dict):
+            continue
+
+        for title, shlok_list in sec.items():
+            for s in shlok_list:
+
+                chapter = s.get("chapter", "")
+                verse = s.get("verse", "")
+
+                reference = f"अध्याय {chapter} • श्लोक {verse}"
+
+                flat.append({
+                    "section": title,
+                    "problem": title,
+                    "reference": reference,
+                    "text": s.get("sanskrit", ""),
+                    "meaning": s.get("hindi_arth", ""),
+                    "example": s.get("udaharan", "")
+                })
     return flat
 
 
@@ -47,27 +57,36 @@ def clean_text_for_example(t):
     return " ".join([line.strip() for line in str(t).splitlines() if line.strip()])
 
 
+# ---------------------------------------------------------
+# Final CLEAN HTML generator – NO f-strings
+# ---------------------------------------------------------
 def generate_html(flat):
+
+    # ------------------- BUILD JS OBJECT ARRAY -------------------
     js_entries = []
 
-    for i, s in enumerate(flat, start=0):
+    for i, s in enumerate(flat):
         meaning = clean_text_for_example(s["meaning"])
         example = clean_text_for_example(s["example"])
 
-        js_entries.append(
-f"""        {{
-            id: {i},
-            section: `{js_escape(s['section'])}`,
-            problem: `{js_escape(s['problem'])}`,
-            reference: `{js_escape(s['reference'])}`,
-            text: `{js_escape(s['text'])}`,
-            meaning: `{js_escape(meaning)}`,
-            example: `{js_escape(example)}`
-        }}"""
+        entry = (
+            "        {\n"
+            f"            id: {i},\n"
+            f"            section: `{js_escape(s['section'])}`,\n"
+            f"            problem: `{js_escape(s['problem'])}`,\n"
+            f"            reference: `{js_escape(s['reference'])}`,\n"
+            f"            text: `{js_escape(s['text'])}`,\n"
+            f"            meaning: `{js_escape(meaning)}`,\n"
+            f"            example: `{js_escape(example)}`\n"
+            "        }"
         )
+        js_entries.append(entry)
 
     js_array = ",\n".join(js_entries)
 
+    # ---------------------------------------------------------
+    # HTML as a SAFE triple-quoted string (no Python parsing)
+    # ---------------------------------------------------------
     html = """
 <!DOCTYPE html>
 <html>
@@ -82,10 +101,8 @@ body { margin:0; padding:12px; font-family:Arial; background:#ff9800; }
 h1 { font-size:24px; margin:6px 0; }
 h3 { font-size:21px; margin:0 0 6px 0; }
 hr { border:none; border-bottom:2px solid black; margin:6px 0; }
-
 .container { display:flex; flex-direction:column; min-height:calc(100vh - 140px); }
 .content-wrap { overflow:auto; padding-bottom:12px; }
-
 .frame {
   background:white; border:2px solid black; border-radius:12px;
   padding:12px; margin-top:12px; min-height:160px;
@@ -94,7 +111,6 @@ hr { border:none; border-bottom:2px solid black; margin:6px 0; }
   background:#e7f9e6; border-color:#8fd19b;
   box-shadow:0 0 12px rgba(0,128,64,0.25);
 }
-
 button {
   padding:7px 14px; border:none; border-radius:14px;
   margin:3px; font-size:14px; font-weight:bold; cursor:pointer;
@@ -102,20 +118,16 @@ button {
 .green { background:#2e7d32; color:white; }
 .red { background:#b71c1c; color:white; }
 .blue { background:#1565c0; color:white; }
-
 .small-btn { padding:5px 10px; font-size:13px; }
 pre { white-space:pre-wrap; font-size:16px; margin-top:8px; }
-
 .controls-row { text-align:center; margin:8px 0; }
 .voice-controls { display:inline-block; margin-left:14px; }
-
 .toggle {
   margin:0 6px; padding:6px 10px; border-radius:10px;
   background:white; border:1px solid rgba(0,0,0,0.12); cursor:pointer;
 }
 .selected { background:#1976d2; color:white; }
 .speed-selected { background:#388e3c; color:white; }
-
 .nav {
   display:flex; justify-content:space-between; font-weight:bold;
   margin-top:12px; position:sticky; bottom:0; padding-top:10px;
@@ -151,35 +163,15 @@ pre { white-space:pre-wrap; font-size:16px; margin-top:8px; }
 
 <script>
 
-// ===============================
-// GLOBAL DECLARATIONS FOR WEBVIEW
-// ===============================
-window.startReadingAll =
-window.stopReading =
-window.resumeReading =
-window.readRandom =
-window.readSingle =
-window.stopSingle =
-window.exitApp =
-window.nextPage =
-window.prevPage =
-window.render =
-window.readNext =
-window.highlightFrame =
-window.clearHighlights =
-null;
-
-// ===============================
-const PER_PAGE = """ + str(SHLOKAS_PER_PAGE) + """;
-let page=0, reading=false, autoIndex=0, readTimer=null;
-
-let selectedGender = localStorage.getItem('gita_voice_gender') || 'female';
-let selectedSpeed  = localStorage.getItem('gita_voice_speed')  || 'slow';
+const PER_PAGE = __PER_PAGE__ ;
 
 const SHLOKAS = [
-""" + js_array + """
+__JS_ARRAY__
 ];
 
+let page=0, reading=false, autoIndex=0, readTimer=null;
+let selectedGender = localStorage.getItem('gita_voice_gender') || 'female';
+let selectedSpeed  = localStorage.getItem('gita_voice_speed')  || 'slow';
 let browserVoice=null;
 
 function loadVoices() {
@@ -198,6 +190,7 @@ function loadVoices() {
 }
 speechSynthesis.onvoiceschanged = loadVoices;
 
+
 function speedRate() {
     if (selectedSpeed === 'very_slow') return 0.72;
     if (selectedSpeed === 'slow') return 0.82;
@@ -205,7 +198,12 @@ function speedRate() {
 }
 
 function speak(text) {
-    try { if (Android?.speak) { Android.speak(text,selectedGender,selectedSpeed); return; } }
+    try { 
+        if (Android?.speak) { 
+            Android.speak(text,selectedGender,selectedSpeed); 
+            return; 
+        } 
+    }
     catch(e) {}
 
     let u = new SpeechSynthesisUtterance(text);
@@ -213,92 +211,116 @@ function speak(text) {
     u.rate  = speedRate();
     u.pitch = selectedGender==='female' ? 1.05 : 0.95;
     u.lang  = browserVoice?.lang || 'hi-IN';
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
+
+    speechSynthesis.cancel(); 
+    speechSynthesis.speak(u);
 }
 
 function stopTTS() {
-    try { Android.stopSpeak(); return; } catch(e){}
+    try { Android.stopSpeak(); return; }
+    catch(e){}
     speechSynthesis.cancel();
 }
 
-window.clearHighlights = function() {
+function clearHighlights(){
     document.querySelectorAll(".frame.highlight").forEach(e=>e.classList.remove("highlight"));
-};
-
-window.highlightFrame = function(i){
+}
+function highlightFrame(i){
     clearHighlights();
     const el=document.getElementById("shlok_"+i);
-    if(el){ el.classList.add("highlight"); el.scrollIntoView({behavior:'smooth',block:'center'}); }
-};
+    if(el){ 
+        el.classList.add("highlight"); 
+        el.scrollIntoView({behavior:'smooth',block:'center'}); 
+    }
+}
 
-window.startReadingAll = function(){
+function startReadingAll(){
     stopReading();
-    reading=true; autoIndex=0;
+    reading=true; 
+    autoIndex=0;
     readNext();
-};
-
-window.readNext = function(){
+}
+function readNext(){
     if(!reading) return;
 
     if(autoIndex>=SHLOKAS.length){
-        reading=false; clearHighlights(); return;
+        reading=false; 
+        clearHighlights(); 
+        return;
     }
 
     highlightFrame(autoIndex);
 
     const s=SHLOKAS[autoIndex];
-    speak(s.text + "\\n\\nअर्थ:\\n" + s.meaning + "\\n\\nउदाहरण:\\n" + s.example);
+    speak(
+        s.text +
+        "\\n\\nअर्थ:\\n" + s.meaning +
+        "\\n\\nउदाहरण:\\n" + s.example
+    );
 
-    readTimer=setTimeout(()=>{ autoIndex++; readNext(); },14000);
-};
-
-window.stopReading = function(){
+    readTimer=setTimeout(()=>{ 
+        autoIndex++; 
+        readNext(); 
+    },14000);
+}
+function stopReading(){
     reading=false;
     clearTimeout(readTimer);
     stopTTS();
     clearHighlights();
-};
-
-window.resumeReading = function(){
+}
+function resumeReading(){
     if(!reading){ reading=true; readNext(); }
-};
-
-window.readRandom = function(){
+}
+function readRandom(){
     stopReading();
     const i=Math.floor(Math.random()*SHLOKAS.length);
     readSingle(i);
-};
-
-window.readSingle = function(i){
+}
+function readSingle(i){
     stopReading();
     highlightFrame(i);
+
     const s=SHLOKAS[i];
-    speak(s.text + "\\n\\nअर्थ:\\n" + s.meaning + "\\n\\nउदाहरण:\\n" + s.example);
-};
-
-window.stopSingle = function(){ stopReading(); };
-
-window.exitApp = function(){
-    try { Android.exitApp(); return; } catch(e){}
+    speak(
+        s.text +
+        "\\n\\nअर्थ:\\n" + s.meaning +
+        "\\n\\nउदाहरण:\\n" + s.example
+    );
+}
+function stopSingle(){ 
+    stopReading(); 
+}
+function exitApp(){
+    try { Android.exitApp(); return; } 
+    catch(e){}
     window.close();
-};
+}
 
-window.render = function(){
+function render(){
     const start=page*PER_PAGE;
     const end=Math.min(start+PER_PAGE,SHLOKAS.length);
     let html="";
 
     for(let i=start;i<end;i++){
         let s=SHLOKAS[i];
+
         html+=`
         <div class="frame" id="shlok_${i}">
-            <button class="blue small-btn" onclick="readSingle(${i})">▶ Start This Shlok</button>
-            <button class="red small-btn" onclick="stopSingle()">■ Stop</button>
+
+            <div style="font-weight:bold; margin-bottom:6px;">
+                ${i + 1}) 
+                <button class="blue small-btn" onclick="readSingle(${i})">▶ Start This Shlok</button>
+                <button class="red small-btn" onclick="stopSingle()">■ Stop</button>
+            </div>
 
             <h4>📗 अनुभाग: ${s.section}</h4>
-            <b>समस्या:</b> ${s.problem}<br>
+            <b>समस्या:</b> ${s.problem}<br><br>
+
             <b>${s.reference}</b><br>
+
             <pre>${s.text}</pre>
+
             <b>अर्थ:</b> ${s.meaning}<br><br>
             <b>उदाहरण:</b> ${s.example}
         </div>`;
@@ -306,23 +328,19 @@ window.render = function(){
 
     document.getElementById("content").innerHTML=html;
     document.getElementById("pageInfo").innerText =
-      "Page "+(page+1)+" / "+Math.ceil(SHLOKAS.length/PER_PAGE);
-};
+        "Page "+(page+1)+" / "+Math.ceil(SHLOKAS.length/PER_PAGE);
+}
 
-window.nextPage = function(){
+function nextPage(){
     page=(page+1)%Math.ceil(SHLOKAS.length/PER_PAGE);
     render();
-};
-
-window.prevPage = function(){
+}
+function prevPage(){
     page=(page-1+Math.ceil(SHLOKAS.length/PER_PAGE))%
          Math.ceil(SHLOKAS.length/PER_PAGE);
     render();
-};
+}
 
-// ===============================
-// VOICE CONTROL BUTTONS FIX
-// ===============================
 function renderVoiceControls(){
     const c=document.getElementById("voiceControls");
     c.innerHTML="";
@@ -330,13 +348,23 @@ function renderVoiceControls(){
     const g1=document.createElement("button");
     g1.textContent="♀ Female";
     g1.className="toggle"+(selectedGender==="female"?" selected":"");
-    g1.onclick=()=>{ selectedGender="female"; localStorage.setItem("gita_voice_gender","female"); loadVoices(); renderVoiceControls(); };
+    g1.onclick=()=>{
+        selectedGender="female";
+        localStorage.setItem("gita_voice_gender","female");
+        loadVoices();
+        renderVoiceControls();
+    };
     c.appendChild(g1);
 
     const g2=document.createElement("button");
-    g2.textContent="♂ Male";
+    g2.textContent="male";
     g2.className="toggle"+(selectedGender==="male"?" selected":"");
-    g2.onclick=()=>{ selectedGender="male"; localStorage.setItem("gita_voice_gender","male"); loadVoices(); renderVoiceControls(); };
+    g2.onclick=()=>{
+        selectedGender="male";
+        localStorage.setItem("gita_voice_gender","male");
+        loadVoices();
+        renderVoiceControls();
+    };
     c.appendChild(g2);
 
     const speeds=[
@@ -349,7 +377,11 @@ function renderVoiceControls(){
         const b=document.createElement("button");
         b.textContent=s.label;
         b.className="toggle"+(selectedSpeed===s.key?" speed-selected":"");
-        b.onclick=()=>{ selectedSpeed=s.key; localStorage.setItem("gita_voice_speed",s.key); renderVoiceControls(); };
+        b.onclick=()=>{
+            selectedSpeed=s.key;
+            localStorage.setItem("gita_voice_speed",s.key);
+            renderVoiceControls();
+        };
         c.appendChild(b);
     });
 }
@@ -357,24 +389,37 @@ function renderVoiceControls(){
 loadVoices();
 renderVoiceControls();
 render();
-</script>
 
+</script>
 </body>
 </html>
 """
 
+    # Replace placeholders
+    html = html.replace("__PER_PAGE__", str(SHLOKAS_PER_PAGE))
+    html = html.replace("__JS_ARRAY__", js_array)
+
     return html
 
 
+# ---------------------------------------------------------
+# WRITE HTML
+# ---------------------------------------------------------
 def main():
     flat = flatten_sections(ALL_SHLOKAS)
     html = generate_html(flat)
+
     os.makedirs(os.path.dirname(OUTPUT_HTML), exist_ok=True)
+
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
         f.write(html)
+
     print("✔ HTML Generated:", OUTPUT_HTML)
-    try: webbrowser.open("file://" + OUTPUT_HTML)
-    except: pass
+
+    try:
+        webbrowser.open("file://" + OUTPUT_HTML)
+    except:
+        pass
 
 
 if __name__ == "__main__":
