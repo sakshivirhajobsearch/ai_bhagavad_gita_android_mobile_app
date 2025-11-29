@@ -9,12 +9,8 @@ OUTPUT_HTML = os.path.join(
 )
 
 SHLOKAS_PER_PAGE = 2
-FRAME_HEIGHT_PX = 480  # fixed frame height (pixels)
 
 
-# ------------------------
-# Utility: flatten sections
-# ------------------------
 def flatten_sections(all_sections):
     flat = []
     for sec in all_sections:
@@ -34,9 +30,6 @@ def flatten_sections(all_sections):
     return flat
 
 
-# ------------------------
-# Utility: JS escape text
-# ------------------------
 def js_escape(text):
     if text is None:
         return ""
@@ -49,32 +42,25 @@ def js_escape(text):
     )
 
 
-# ------------------------
-# Utility: normalize empty example/meaning
-# ------------------------
-def clean_text(t):
+def clean_text_for_example(t):
     if not t or str(t).strip() == "":
         return "—"
-    return str(t).strip()
+    # remove accidental blank lines at start/end and collapse multiple blank lines
+    return "\n".join([line.rstrip() for line in str(t).strip().splitlines() if line.strip() != ""])
 
 
-# ------------------------
-# Generate HTML
-# ------------------------
 def generate_html(flat_data):
     js_entries = []
     for i, s in enumerate(flat_data, start=1):
-        # ensure example/meaning default to visible placeholder
-        meaning = clean_text(s.get("meaning", ""))
-        example = clean_text(s.get("example", ""))
-
+        meaning = clean_text_for_example(s.get("meaning", ""))
+        example = clean_text_for_example(s.get("example", ""))
         js_entries.append(
 f"""        {{
             id: {i},
-            section: `{js_escape(s.get('section', ''))}`,
-            problem: `{js_escape(s.get('problem', ''))}`,
-            reference: `{js_escape(s.get('reference', ''))}`,
-            text: `{js_escape(s.get('text', ''))}`,
+            section: `{js_escape(s.get('section',''))}`,
+            problem: `{js_escape(s.get('problem',''))}`,
+            reference: `{js_escape(s.get('reference',''))}`,
+            text: `{js_escape(s.get('text',''))}`,
             meaning: `{js_escape(meaning)}`,
             example: `{js_escape(example)}`
         }}"""
@@ -82,34 +68,35 @@ f"""        {{
 
     js_array = ",\n".join(js_entries)
 
-    # Note: Use double braces {{ }} in the Python f-string so that JS template strings like ${{
-    # s.text }} are preserved correctly in the generated HTML. CSS blocks are also doubled.
-    html = f"""
-<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
 <title>AI Bhagwat Geeta by Anurag Vasu Bharti</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
+/* keep look & feel exactly as requested + stick nav */
 body {{
-  margin: 0;
-  padding: 12px;
+  margin:0;
+  padding:12px;
   font-family: Arial, sans-serif;
   background: #ff9800;
 }}
 
-h1 {{
+.title-block {{
+  width:100%;
   text-align:center;
+}}
+
+h1 {{
   font-size:24px;
-  margin: 6px 0;
+  margin:6px 0;
 }}
 
 h3 {{
-  text-align:center;
   font-size:18px;
-  margin: 0 0 6px 0;
+  margin:0 0 6px 0;
 }}
 
 hr {{
@@ -118,19 +105,31 @@ hr {{
   margin: 6px 0;
 }}
 
+.container {{
+  display:flex;
+  flex-direction:column;
+  min-height: calc(100vh - 140px);
+}}
+
+.content-wrap {{
+  overflow:auto;
+  padding-bottom: 12px;
+}}
+
 .frame {{
   background: white;
   border: 2px solid black;
   border-radius: 12px;
   padding: 12px;
   margin-top: 12px;
-  height: {FRAME_HEIGHT_PX}px;
-  overflow-y: auto;
+  height: auto; /* auto height */
+  min-height: 160px;
+  max-width:100%;
 }}
 
 .frame.highlight {{
   background: #e7f9e6; /* light green */
-  box-shadow: 0 0 12px rgba(0, 128, 64, 0.12);
+  box-shadow: 0 0 12px rgba(0,128,64,0.08);
   border-color: #8fd19b;
 }}
 
@@ -148,23 +147,15 @@ button {{
 .red   {{ background:#b71c1c; color:white; }}
 .blue  {{ background:#1565c0; color:white; }}
 
-.small-btn {{
-  padding:5px 10px;
-  font-size:13px;
-}}
+.small-btn {{ padding:5px 10px; font-size:13px; }}
 
 pre {{
   white-space: pre-wrap;
   font-size: 16px;
   margin-top: 8px;
+  margin-bottom:0;
 }}
 
-.nav {{
-  display:flex;
-  justify-content: space-between;
-  font-weight:bold;
-  margin-top:14px;
-}}
 .controls-row {{
   text-align:center;
   margin: 8px 0;
@@ -192,41 +183,51 @@ pre {{
   background:#388e3c; color:white;
   border-color:#2e7d32;
 }}
+
+.nav {{
+  display:flex;
+  justify-content: space-between;
+  font-weight:bold;
+  margin-top:12px;
+  position: sticky;
+  bottom: 0;
+  background: transparent;
+  padding-top:10px;
+}}
 </style>
 </head>
 <body>
 
-<h1>AI Bhagwat Geeta by Anurag Vasu Bharti</h1>
-<hr>
-<h3>📘 भगवद गीता में अपनी समस्याओं का समाधान खोजें</h3>
-<hr>
+<div class="title-block">
+  <h1>AI Bhagwat Geeta by Anurag Vasu Bharti</h1>
+  <hr>
+  <h3>📘 भगवद गीता में अपनी समस्याओं का समाधान खोजें</h3>
+  <hr>
+</div>
 
 <div class="controls-row">
   <button class="green" onclick="startReadingAll()">Start</button>
   <button class="red" onclick="stopReading()">Stop</button>
   <button class="green" onclick="resumeReading()">Resume</button>
   <button class="green" onclick="readRandom()">Random</button>
-  <button class="red" onclick="exitApp()">Exit</button>
+  <button class="red" onclick="Android.exitApp()">Exit</button>
 
-  <span class="voice-controls" id="voiceControls">
-    <!-- Voice toggle buttons inserted by JS -->
-  </span>
+  <span class="voice-controls" id="voiceControls"></span>
 </div>
 
-<hr>
+<div class="container">
+  <div class="content-wrap" id="contentWrap">
+    <div id="content"></div>
+  </div>
 
-<div id="content"></div>
-
-<div class="nav">
-  <button onclick="prevPage()">⬅ Previous</button>
-  <span id="pageInfo"></span>
-  <button onclick="nextPage()">Next ➡</button>
+  <div class="nav">
+    <button onclick="prevPage()">⬅ Previous</button>
+    <span id="pageInfo"></span>
+    <button onclick="nextPage()">Next ➡</button>
+  </div>
 </div>
 
 <script>
-/* -------------------------
-   Data
-   ------------------------- */
 const PER_PAGE = {SHLOKAS_PER_PAGE};
 let page = 0;
 
@@ -234,66 +235,52 @@ let reading = false;
 let autoIndex = 0;
 let readTimer = null;
 
-let selectedGender = localStorage.getItem('gita_voice_gender') || 'female'; // 'female'|'male'
-let selectedSpeed = localStorage.getItem('gita_voice_speed') || 'slow'; // 'slow'|'medium'|'very_slow'
+let selectedGender = localStorage.getItem('gita_voice_gender') || 'female';
+let selectedSpeed = localStorage.getItem('gita_voice_speed') || 'slow';
 
 const SHLOKAS = [
 {js_array}
 ];
 
-/* -------------------------
-   Voice selection & TTS
-   ------------------------- */
-
 let browserVoice = null;
 
 function loadVoices() {{
     let vlist = speechSynthesis.getVoices();
-    if (!vlist || vlist.length === 0) {{
-        return;
-    }}
+    if (!vlist || vlist.length === 0) return;
 
-    // Prefer Hindi / Indian voices when female requested
     if (selectedGender === 'female') {{
         browserVoice = vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')) && v.name.toLowerCase().includes('female'))
-                      || vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')))
-                      || vlist.find(v => v.name.toLowerCase().includes('google hindi female'))
-                      || vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in'))
-                      || vlist[0];
+            || vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')))
+            || vlist.find(v => v.name.toLowerCase().includes('google hindi female'))
+            || vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in'))
+            || vlist[0];
     }} else {{
         browserVoice = vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')) && v.name.toLowerCase().includes('male'))
-                      || vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')))
-                      || vlist.find(v => v.name.toLowerCase().includes('male'))
-                      || vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in'))
-                      || vlist[0];
+            || vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')))
+            || vlist.find(v => v.name.toLowerCase().includes('male'))
+            || vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in'))
+            || vlist[0];
     }}
 }}
 
 speechSynthesis.onvoiceschanged = function() {{ loadVoices(); }};
 
-/* speed multipliers */
 function speedRateFromSelection() {{
-    if (selectedSpeed === 'very_slow') return 0.71;
+    if (selectedSpeed === 'very_slow') return 0.72;
     if (selectedSpeed === 'slow') return 0.82;
-    return 0.95; // medium
+    return 0.95;
 }}
 
-/* speak function: Android TTS fallback then browser TTS */
 function speak(text) {{
+    // first try Android advanced TTS
     try {{
         if (typeof Android !== 'undefined' && Android.speak) {{
-            // Android native TTS: pass (text, gender, speed)
-            try {{
-                Android.speak(text, selectedGender, selectedSpeed);
-                return;
-            }} catch(e) {{
-                // fallback to browser if Android speak exists but fails
-            }}
+            Android.speak(text, selectedGender, selectedSpeed);
+            return;
         }}
-    }} catch(e) {{
-        // ignore Android access errors
-    }}
+    }} catch(e) {{ /* ignore */ }}
 
+    // browser fallback
     if (!window.speechSynthesis) return;
 
     if (!browserVoice) loadVoices();
@@ -302,7 +289,6 @@ function speak(text) {{
     u.rate = speedRateFromSelection();
     u.pitch = (selectedGender === 'female') ? 1.05 : 0.95;
     if (browserVoice) u.voice = browserVoice;
-    // Prefer Hindi or en-IN language tag if voice doesn't provide
     u.lang = (browserVoice && browserVoice.lang) ? browserVoice.lang : (selectedGender === 'female' ? 'hi-IN' : 'en-IN');
 
     window.speechSynthesis.cancel();
@@ -315,18 +301,14 @@ function stopSpeaking() {{
             Android.stopSpeak();
             return;
         }}
-    }} catch(e) {{}}
+    }} catch(e) {{ }}
     if (window.speechSynthesis) window.speechSynthesis.cancel();
 }}
 
-/* -------------------------
-   UI: voice buttons (top bar)
-   ------------------------- */
 function renderVoiceControls() {{
     const container = document.getElementById('voiceControls');
     container.innerHTML = '';
 
-    // Gender toggles
     const femaleBtn = document.createElement('button');
     femaleBtn.innerText = '♀ Female';
     femaleBtn.className = 'toggle' + (selectedGender === 'female' ? ' selected' : '');
@@ -349,13 +331,11 @@ function renderVoiceControls() {{
     }};
     container.appendChild(maleBtn);
 
-    // Speed toggles
     const speeds = [
         {{ key: 'very_slow', label: 'Very Slow' }},
         {{ key: 'slow', label: 'Slow' }},
         {{ key: 'medium', label: 'Medium' }}
     ];
-
     speeds.forEach(s => {{
         const b = document.createElement('button');
         b.innerText = s.label;
@@ -372,9 +352,6 @@ function renderVoiceControls() {{
 renderVoiceControls();
 loadVoices();
 
-/* -------------------------
-   Highlight helper
-   ------------------------- */
 function clearHighlights() {{
     document.querySelectorAll('.frame.highlight').forEach(el => el.classList.remove('highlight'));
 }}
@@ -385,14 +362,11 @@ function highlightFrame(i) {{
     if (el) el.classList.add('highlight');
 }}
 
-/* -------------------------
-   Individual shlok control
-   ------------------------- */
 function readSingle(i) {{
     stopReading();
     highlightFrame(i);
     const s = SHLOKAS[i];
-    speak(s.text + "\\nअर्थ: " + (s.meaning || '—') + "\\nउदाहरण: " + (s.example || '—'));
+    speak(s.text + '\\nअर्थ: ' + (s.meaning || '—') + '\\nउदाहरण: ' + (s.example || '—'));
 }}
 
 function stopSingle(i) {{
@@ -400,21 +374,14 @@ function stopSingle(i) {{
     clearHighlights();
 }}
 
-/* -------------------------
-   Render page content
-   ------------------------- */
 function render() {{
     const start = page * PER_PAGE;
     const end = Math.min(start + PER_PAGE, SHLOKAS.length);
-
     let html = '';
     for (let i = start; i < end; i++) {{
         const s = SHLOKAS[i];
-
-        // using JS template markers ${{...}} so Python f-string doesn't evaluate them
         html += `
         <div class="frame" id="shlok_${{i}}">
-
             <button class="blue small-btn" onclick="readSingle(${{i}})">▶ Start This Shlok</button>
             <button class="red small-btn" onclick="stopSingle(${{i}})">■ Stop</button>
 
@@ -428,26 +395,22 @@ function render() {{
             <b>उदाहरण:</b> ${{s.example}}
         </div>`;
     }}
-
     document.getElementById('content').innerHTML = html;
     document.getElementById('pageInfo').innerText = 'Page ' + (page + 1) + ' / ' + Math.ceil(SHLOKAS.length / PER_PAGE);
 }}
 
-/* -------------------------
-   Navigation
-   ------------------------- */
 function nextPage() {{
     page = (page + 1) % Math.ceil(SHLOKAS.length / PER_PAGE);
     render();
+    // keep focus at top of content wrapper
+    document.getElementById('contentWrap').scrollTop = 0;
 }}
 function prevPage() {{
     page = (page - 1 + Math.ceil(SHLOKAS.length / PER_PAGE)) % Math.ceil(SHLOKAS.length / PER_PAGE);
     render();
+    document.getElementById('contentWrap').scrollTop = 0;
 }}
 
-/* -------------------------
-   Sequential reading controls
-   ------------------------- */
 function startReadingAll() {{
     stopReading();
     reading = true;
@@ -464,7 +427,7 @@ function readNext() {{
     }}
     highlightFrame(autoIndex);
     const s = SHLOKAS[autoIndex];
-    speak(s.text + "\\nअर्थ: " + (s.meaning || '—') + "\\nउदाहरण: " + (s.example || '—'));
+    speak(s.text + '\\nअर्थ: ' + (s.meaning || '—') + '\\nउदाहरण: ' + (s.example || '—'));
     readTimer = setTimeout(() => {{
         autoIndex++;
         readNext();
@@ -487,13 +450,10 @@ function resumeReading() {{
 
 function readRandom() {{
     stopReading();
-    const idx = Math.floor(Math.random() * SHLOKAS.length);
-    readSingle(idx);
+    const i = Math.floor(Math.random() * SHLOKAS.length);
+    readSingle(i);
 }}
 
-/* -------------------------
-   Exit / utility
-   ------------------------- */
 function exitApp() {{
     try {{
         if (typeof Android !== 'undefined' && Android.exitApp) {{
@@ -504,36 +464,26 @@ function exitApp() {{
     window.close();
 }}
 
-/* -------------------------
-   Init
-   ------------------------- */
 render();
-
 </script>
+
 </body>
 </html>
 """
     return html
 
 
-# ------------------------
-# Main
-# ------------------------
 def main():
     print("🔢 Current Sections Loaded:", len(ALL_SHLOKAS))
     flat = flatten_sections(ALL_SHLOKAS)
-
     print("🔹 Generating HTML...")
     html = generate_html(flat)
-
     os.makedirs(os.path.dirname(OUTPUT_HTML), exist_ok=True)
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
         f.write(html)
-
     print("✔ HTML Generated Successfully:")
     print(OUTPUT_HTML)
-
-    # auto open
+    # Auto open as you chose
     try:
         webbrowser.open("file://" + OUTPUT_HTML)
     except:
