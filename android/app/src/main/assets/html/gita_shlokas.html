@@ -6,123 +6,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-/* keep look & feel exactly as requested + stick nav */
 body {
   margin:0;
   padding:12px;
   font-family: Arial, sans-serif;
   background: #ff9800;
 }
+.title-block { width:100%; text-align:center; }
+h1 { font-size:24px; margin:6px 0; }
+h3 { font-size:18px; margin:0 0 6px 0; }
+hr { border:none; border-bottom:2px solid black; margin:6px 0; }
 
-.title-block {
-  width:100%;
-  text-align:center;
-}
-
-h1 {
-  font-size:24px;
-  margin:6px 0;
-}
-
-h3 {
-  font-size:18px;
-  margin:0 0 6px 0;
-}
-
-hr {
-  border: none;
-  border-bottom: 2px solid black;
-  margin: 6px 0;
-}
-
-.container {
-  display:flex;
-  flex-direction:column;
-  min-height: calc(100vh - 140px);
-}
-
-.content-wrap {
-  overflow:auto;
-  padding-bottom: 12px;
-}
+.container { display:flex; flex-direction:column; min-height: calc(100vh - 140px); }
+.content-wrap { overflow:auto; padding-bottom:12px; }
 
 .frame {
-  background: white;
-  border: 2px solid black;
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 12px;
-  height: auto; /* auto height */
-  min-height: 160px;
-  max-width:100%;
+  background:white; border:2px solid black; border-radius:12px;
+  padding:12px; margin-top:12px; min-height:160px;
 }
-
 .frame.highlight {
-  background: #e7f9e6; /* light green */
-  box-shadow: 0 0 12px rgba(0,128,64,0.08);
-  border-color: #8fd19b;
+  background:#e7f9e6; box-shadow:0 0 12px rgba(0,128,64,0.08); border-color:#8fd19b;
 }
 
 button {
-  padding: 7px 14px;
-  border: none;
-  border-radius: 14px;
-  margin: 3px;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
+  padding: 7px 14px; border:none; border-radius:14px;
+  margin:3px; font-size:14px; font-weight:bold; cursor:pointer;
 }
-
 .green { background:#2e7d32; color:white; }
-.red   { background:#b71c1c; color:white; }
-.blue  { background:#1565c0; color:white; }
+.red { background:#b71c1c; color:white; }
+.blue { background:#1565c0; color:white; }
 
 .small-btn { padding:5px 10px; font-size:13px; }
 
-pre {
-  white-space: pre-wrap;
-  font-size: 16px;
-  margin-top: 8px;
-  margin-bottom:0;
-}
+pre { white-space:pre-wrap; font-size:16px; margin-top:8px; }
 
-.controls-row {
-  text-align:center;
-  margin: 8px 0;
-}
+.controls-row { text-align:center; margin:8px 0; }
 
-.voice-controls {
-  display:inline-block;
-  margin-left:14px;
-  vertical-align: middle;
-}
+.voice-controls { display:inline-block; margin-left:14px; vertical-align:middle; }
 
 .toggle {
-  margin: 0 6px;
-  padding:6px 10px;
-  border-radius:10px;
-  border:1px solid rgba(0,0,0,0.12);
-  background: white;
-  cursor:pointer;
+  margin:0 6px; padding:6px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12);
+  background:white; cursor:pointer;
 }
-.selected {
-  background:#1976d2; color:white;
-  border-color:#115293;
-}
-.speed-selected {
-  background:#388e3c; color:white;
-  border-color:#2e7d32;
-}
+.selected { background:#1976d2; color:white; border-color:#115293; }
+.speed-selected { background:#388e3c; color:white; border-color:#2e7d32; }
 
 .nav {
-  display:flex;
-  justify-content: space-between;
-  font-weight:bold;
-  margin-top:12px;
-  position: sticky;
-  bottom: 0;
-  background: transparent;
-  padding-top:10px;
+  display:flex; justify-content:space-between; font-weight:bold;
+  margin-top:12px; position:sticky; bottom:0; background:transparent; padding-top:10px;
 }
 </style>
 </head>
@@ -160,7 +91,6 @@ pre {
 <script>
 const PER_PAGE = 2;
 let page = 0;
-
 let reading = false;
 let autoIndex = 0;
 let readTimer = null;
@@ -1007,21 +937,23 @@ const SHLOKAS = [
 let browserVoice = null;
 
 function loadVoices() {
-    let vlist = speechSynthesis.getVoices();
+    const vlist = speechSynthesis.getVoices();
     if (!vlist || vlist.length === 0) return;
 
     if (selectedGender === 'female') {
-        browserVoice = vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')) && v.name.toLowerCase().includes('female'))
-            || vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')))
-            || vlist.find(v => v.name.toLowerCase().includes('google hindi female'))
-            || vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in'))
-            || vlist[0];
+        browserVoice =
+            vlist.find(v => v.lang && v.lang.toLowerCase().includes('hi') && v.name.toLowerCase().includes('female')) ||
+            vlist.find(v => v.lang && v.lang.toLowerCase().includes('hi')) ||
+            vlist.find(v => v.name.toLowerCase().includes('google hindi female')) ||
+            vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in')) ||
+            vlist[0];
     } else {
-        browserVoice = vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')) && v.name.toLowerCase().includes('male'))
-            || vlist.find(v => (v.lang && v.lang.toLowerCase().includes('hi')))
-            || vlist.find(v => v.name.toLowerCase().includes('male'))
-            || vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in'))
-            || vlist[0];
+        browserVoice =
+            vlist.find(v => v.lang && v.lang.toLowerCase().includes('hi') && v.name.toLowerCase().includes('male')) ||
+            vlist.find(v => v.lang && v.lang.toLowerCase().includes('hi')) ||
+            vlist.find(v => v.name.toLowerCase().includes('male')) ||
+            vlist.find(v => v.lang && v.lang.toLowerCase().includes('en-in')) ||
+            vlist[0];
     }
 }
 
@@ -1034,24 +966,22 @@ function speedRateFromSelection() {
 }
 
 function speak(text) {
-    // first try Android advanced TTS
     try {
         if (typeof Android !== 'undefined' && Android.speak) {
             Android.speak(text, selectedGender, selectedSpeed);
             return;
         }
-    } catch(e) { /* ignore */ }
+    } catch(e) {}
 
-    // browser fallback
     if (!window.speechSynthesis) return;
 
     if (!browserVoice) loadVoices();
 
     const u = new SpeechSynthesisUtterance(text);
     u.rate = speedRateFromSelection();
-    u.pitch = (selectedGender === 'female') ? 1.05 : 0.95;
-    if (browserVoice) u.voice = browserVoice;
-    u.lang = (browserVoice && browserVoice.lang) ? browserVoice.lang : (selectedGender === 'female' ? 'hi-IN' : 'en-IN');
+    u.pitch = selectedGender === 'female' ? 1.05 : 0.95;
+    u.voice = browserVoice;
+    u.lang = (browserVoice && browserVoice.lang) ? browserVoice.lang : 'hi-IN';
 
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
@@ -1063,41 +993,43 @@ function stopSpeaking() {
             Android.stopSpeak();
             return;
         }
-    } catch(e) { }
+    } catch(e) {}
+
     if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
 function renderVoiceControls() {
-    const container = document.getElementById('voiceControls');
-    container.innerHTML = '';
+    const c = document.getElementById('voiceControls');
+    c.innerHTML = '';
 
-    const femaleBtn = document.createElement('button');
-    femaleBtn.innerText = '♀ Female';
-    femaleBtn.className = 'toggle' + (selectedGender === 'female' ? ' selected' : '');
-    femaleBtn.onclick = () => {
+    const b1 = document.createElement('button');
+    b1.innerText = '♀ Female';
+    b1.className = 'toggle' + (selectedGender === 'female' ? ' selected' : '');
+    b1.onclick = () => {
         selectedGender = 'female';
         localStorage.setItem('gita_voice_gender', selectedGender);
         loadVoices();
         renderVoiceControls();
     };
-    container.appendChild(femaleBtn);
+    c.appendChild(b1);
 
-    const maleBtn = document.createElement('button');
-    maleBtn.innerText = '♂ Male';
-    maleBtn.className = 'toggle' + (selectedGender === 'male' ? ' selected' : '');
-    maleBtn.onclick = () => {
+    const b2 = document.createElement('button');
+    b2.innerText = '♂ Male';
+    b2.className = 'toggle' + (selectedGender === 'male' ? ' selected' : '');
+    b2.onclick = () => {
         selectedGender = 'male';
         localStorage.setItem('gita_voice_gender', selectedGender);
         loadVoices();
         renderVoiceControls();
     };
-    container.appendChild(maleBtn);
+    c.appendChild(b2);
 
     const speeds = [
-        { key: 'very_slow', label: 'Very Slow' },
-        { key: 'slow', label: 'Slow' },
-        { key: 'medium', label: 'Medium' }
+        { key:'very_slow', label:'Very Slow' },
+        { key:'slow', label:'Slow' },
+        { key:'medium', label:'Medium' }
     ];
+
     speeds.forEach(s => {
         const b = document.createElement('button');
         b.innerText = s.label;
@@ -1107,15 +1039,16 @@ function renderVoiceControls() {
             localStorage.setItem('gita_voice_speed', selectedSpeed);
             renderVoiceControls();
         };
-        container.appendChild(b);
+        c.appendChild(b);
     });
 }
 
 renderVoiceControls();
 loadVoices();
 
+
 function clearHighlights() {
-    document.querySelectorAll('.frame.highlight').forEach(el => el.classList.remove('highlight'));
+    document.querySelectorAll('.frame.highlight').forEach(e => e.classList.remove('highlight'));
 }
 
 function highlightFrame(i) {
@@ -1128,7 +1061,12 @@ function readSingle(i) {
     stopReading();
     highlightFrame(i);
     const s = SHLOKAS[i];
-    speak(s.text + '\nअर्थ: ' + (s.meaning || '—') + '\nउदाहरण: ' + (s.example || '—'));
+
+    speak(
+        s.text +
+        '\n\nअर्थ:\n' + (s.meaning || '—') +
+        '\n\nउदाहरण:\n' + (s.example || '—')
+    );
 }
 
 function stopSingle(i) {
@@ -1140,8 +1078,10 @@ function render() {
     const start = page * PER_PAGE;
     const end = Math.min(start + PER_PAGE, SHLOKAS.length);
     let html = '';
+
     for (let i = start; i < end; i++) {
         const s = SHLOKAS[i];
+
         html += `
         <div class="frame" id="shlok_${i}">
             <button class="blue small-btn" onclick="readSingle(${i})">▶ Start This Shlok</button>
@@ -1157,16 +1097,18 @@ function render() {
             <b>उदाहरण:</b> ${s.example}
         </div>`;
     }
+
     document.getElementById('content').innerHTML = html;
-    document.getElementById('pageInfo').innerText = 'Page ' + (page + 1) + ' / ' + Math.ceil(SHLOKAS.length / PER_PAGE);
+    document.getElementById('pageInfo').innerText =
+        'Page ' + (page + 1) + ' / ' + Math.ceil(SHLOKAS.length / PER_PAGE);
 }
 
 function nextPage() {
     page = (page + 1) % Math.ceil(SHLOKAS.length / PER_PAGE);
     render();
-    // keep focus at top of content wrapper
     document.getElementById('contentWrap').scrollTop = 0;
 }
+
 function prevPage() {
     page = (page - 1 + Math.ceil(SHLOKAS.length / PER_PAGE)) % Math.ceil(SHLOKAS.length / PER_PAGE);
     render();
@@ -1187,9 +1129,16 @@ function readNext() {
         clearHighlights();
         return;
     }
+
     highlightFrame(autoIndex);
     const s = SHLOKAS[autoIndex];
-    speak(s.text + '\nअर्थ: ' + (s.meaning || '—') + '\nउदाहरण: ' + (s.example || '—'));
+
+    speak(
+        s.text +
+        '\n\nअर्थ:\n' + (s.meaning || '—') +
+        '\n\nउदाहरण:\n' + (s.example || '—')
+    );
+
     readTimer = setTimeout(() => {
         autoIndex++;
         readNext();
@@ -1222,7 +1171,7 @@ function exitApp() {
             Android.exitApp();
             return;
         }
-    } catch(e) { }
+    } catch(e) {}
     window.close();
 }
 
