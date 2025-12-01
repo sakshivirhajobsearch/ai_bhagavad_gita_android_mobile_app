@@ -191,7 +191,6 @@ function highlightFrame(i){
 // Called by Android via evaluateJavascript (MainActivity) when TTS finishes
 function onSpeakComplete(){
     try {
-        // continue based on current mode
         if(!playing) return;
         if(mode === "seq"){
             playNextSequential();
@@ -232,7 +231,6 @@ function speakNowIndex(i){
         u.onend = function(){ try{ onSpeakComplete(); } catch(e){} };
         speechSynthesis.speak(u);
     } catch(e){
-        // fallback: avoid deadlock — call onSpeakComplete after short delay
         setTimeout(()=>{ try{ onSpeakComplete(); }catch(e){} }, 1000);
     }
 }
@@ -242,11 +240,14 @@ function startSequential(){
     stopReading();
     mode = "seq";
     playing = true;
-    seqIndex = 0;
+    // if we stopped mid-stream, seqIndex should be currentIndex+1 else start 0
+    seqIndex = (currentIndex >= 0) ? currentIndex + 1 : 0;
     if(seqIndex < SHLOKAS.length){
-        page = Math.floor(seqIndex / PER_PAGE);
+        let i = seqIndex;
+        seqIndex++;
+        page = Math.floor(i / PER_PAGE);
         render();
-        setTimeout(()=>{ highlightFrame(seqIndex); speakNowIndex(seqIndex); seqIndex++; }, 180);
+        setTimeout(()=>{ highlightFrame(i); speakNowIndex(i); }, 180);
     } else {
         playing = false;
     }
@@ -266,13 +267,13 @@ function playNextSequential(){
     setTimeout(()=>{ highlightFrame(i); speakNowIndex(i); }, 180);
 }
 
-// NEXT button behavior: start from next highlighted and continue sequentially
+// NEXT button behavior: immediate next shlok and continue sequentially
 function nextButton(){
     stopReading();
     mode = "seq";
     playing = true;
 
-    // find highlighted index
+    // compute next index: if there's a highlighted index use that+1, else use currentIndex+1
     let highlighted = -1;
     document.querySelectorAll('.frame').forEach(function(f){
         if(f.classList.contains('highlight')){
@@ -280,15 +281,14 @@ function nextButton(){
         }
     });
 
-    seqIndex = (highlighted === -1) ? 0 : highlighted + 1;
-    if(seqIndex < 0) seqIndex = 0;
-    if(seqIndex >= SHLOKAS.length){
+    let startIdx = (highlighted !== -1) ? highlighted + 1 : (currentIndex >= 0 ? currentIndex + 1 : 0);
+    if(startIdx >= SHLOKAS.length){
         playing = false;
         return;
     }
 
-    let i = seqIndex;
-    seqIndex++;
+    seqIndex = startIdx + 1; // we'll set seqIndex to next after the one we will play now
+    let i = startIdx;
     page = Math.floor(i / PER_PAGE);
     render();
     setTimeout(()=>{ highlightFrame(i); speakNowIndex(i); }, 180);
@@ -339,7 +339,7 @@ function playNextRandom(){
     }
 }
 
-// Read a single shlok (user clicks this shlok's play button) — doesn't change mode; plays that one only
+// Read a single shlok (user clicks this shlok's play button) — plays that one only
 function readSingle(i){
     stopReading();
     mode = null;
@@ -362,6 +362,8 @@ function resumeReading(){
     if(playing) return; // already playing
     // resume depending on mode
     if(mode === "seq"){
+        // ensure seqIndex is at least currentIndex+1
+        seqIndex = Math.max(seqIndex, (currentIndex >= 0 ? currentIndex + 1 : 0));
         if(seqIndex < SHLOKAS.length){
             playing = true;
             let i = seqIndex;
