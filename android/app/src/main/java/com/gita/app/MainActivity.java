@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
-import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -43,8 +42,8 @@ public class MainActivity extends AppCompatActivity {
                     tts.setLanguage(new Locale("hi", "IN"));
                 } catch (Exception ignored) {}
 
-                // apply default female voice if available
-                applyVoice("female");
+                // default pitch/voice
+                applyVoiceAndPitch("female");
 
                 if (pendingText != null) {
                     speakInternal(pendingText, pendingGender, pendingSpeed);
@@ -67,69 +66,58 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception ignored) {}
     }
 
-    // Robust voice detection across devices
-    private Voice findVoice(String gender) {
+    private Voice findVoiceByGender(String gender) {
         if (tts == null) return null;
         try {
             Set<Voice> voices = tts.getVoices();
             if (voices == null) return null;
 
-            // Prefer explicit male/female markers in name
+            // 1) prefer hi-IN locale voices and names indicating male/female
             for (Voice v : voices) {
+                Locale loc = v.getLocale();
                 String name = v.getName().toLowerCase();
-                if (gender.equals("male")) {
-                    if (name.contains("male") || name.contains("standard-b") ||
-                            name.contains("standard-d") || name.contains("-m") || name.contains("male_local") ||
-                            name.contains("hi-in-x-hid") || name.contains("hi-in-x-hid-local"))
+                if (loc != null && "hi".equals(loc.getLanguage())) {
+                    if (gender.equals("male") && (name.contains("male") || name.contains("b") || name.contains("m"))) {
                         return v;
-                } else {
-                    if (name.contains("female") || name.contains("standard-a") ||
-                            name.contains("standard-c") || name.contains("-f") || name.contains("female_local") ||
-                            name.contains("hi-in-x-hia") || name.contains("hi-in-x-hia-local"))
+                    }
+                    if (gender.equals("female") && (name.contains("female") || name.contains("a") || name.contains("c"))) {
                         return v;
+                    }
                 }
             }
 
-            // If not found, try matching locale hi-IN voices first
+            // 2) fallback: any hi locale voice
             for (Voice v : voices) {
-                if (v.getLocale() != null && v.getLocale().getLanguage().equals("hi")) {
-                    String name = v.getName().toLowerCase();
-                    if (gender.equals("male") && (name.contains("b") || name.contains("m") || name.contains("male")))
-                        return v;
-                    if (gender.equals("female") && (name.contains("a") || name.contains("c") || name.contains("female")))
-                        return v;
-                }
+                Locale loc = v.getLocale();
+                if (loc != null && "hi".equals(loc.getLanguage())) return v;
             }
 
-            // fallback: first voice with hi locale
-            for (Voice v : voices) {
-                if (v.getLocale() != null && "hi".equals(v.getLocale().getLanguage())) return v;
-            }
-
-            // last resort: any voice
+            // 3) last resort: first available voice
             for (Voice v : voices) return v;
 
         } catch (Exception ignored) {}
         return null;
     }
 
-    private void applyVoice(String gender) {
-        Voice v = findVoice(gender);
-        if (v != null) {
-            try { tts.setVoice(v); } catch (Exception ignored) {}
-        }
+    private void applyVoiceAndPitch(String gender) {
+        try {
+            Voice v = findVoiceByGender(gender);
+            if (v != null) {
+                try { tts.setVoice(v); } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+
+        // If no explicit male voice is found, lower pitch a bit for "male" to give male-sounding result
+        try {
+            if ("male".equalsIgnoreCase(gender)) tts.setPitch(0.9f);
+            else tts.setPitch(1.05f);
+        } catch (Exception ignored) {}
     }
 
     private class JsBridge {
-
         @JavascriptInterface
         public void speak(String text, String gender, String speed) {
             speakInternal(text, gender, speed);
-        }
-
-        @JavascriptInterface
-        public boolean isSpeaking() {
-            try { return tts != null && tts.isSpeaking(); } catch (Exception e) { return false; }
         }
 
         @JavascriptInterface
@@ -139,17 +127,22 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void setVoice(String gender) {
-            try { applyVoice(gender); } catch (Exception ignored) {}
+            try { applyVoiceAndPitch(gender); } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
         public void setSpeed(String speed) {
             try {
                 float rate = 0.82f;
-                if ("very_slow".equals(speed)) rate = 0.72f;
-                else if ("medium".equals(speed)) rate = 0.95f;
+                if ("very_slow".equalsIgnoreCase(speed)) rate = 0.72f;
+                else if ("medium".equalsIgnoreCase(speed)) rate = 0.95f;
                 tts.setSpeechRate(rate);
             } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public boolean isSpeaking() {
+            try { return tts != null && tts.isSpeaking(); } catch (Exception e) { return false; }
         }
 
         @JavascriptInterface
@@ -166,35 +159,34 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // set voice
-        applyVoice(gender == null ? "female" : gender);
+        if (gender == null) gender = "female";
+        if (speed == null) speed = "slow";
 
-        // set speed
+        // apply voice & pitch first
+        applyVoiceAndPitch(gender);
+
+        // set rate
         float rate = 0.82f;
-        if ("very_slow".equals(speed)) rate = 0.72f;
-        else if ("medium".equals(speed)) rate = 0.95f;
+        if ("very_slow".equalsIgnoreCase(speed)) rate = 0.72f;
+        else if ("medium".equalsIgnoreCase(speed)) rate = 0.95f;
         try { tts.setSpeechRate(rate); } catch (Exception ignored) {}
 
-        // set utterance listener — notify JS when done
+        // Utterance listener -> call JS callback on completion
         tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
             @Override public void onStart(String utteranceId) {}
-
-            @Override
-            public void onDone(String utteranceId) {
+            @Override public void onDone(String utteranceId) {
                 runOnUiThread(() -> {
                     try {
                         webView.evaluateJavascript("onSpeakComplete();", null);
                     } catch (Exception ignored) {}
                 });
             }
-
             @Override public void onError(String utteranceId) {}
         });
 
         try {
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "GITA_TTS");
         } catch (Exception e) {
-            // fallback: try resetting locale and speak
             try {
                 tts.setLanguage(new Locale("hi", "IN"));
                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "GITA_TTS");

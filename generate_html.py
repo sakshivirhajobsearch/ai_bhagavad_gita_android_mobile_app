@@ -240,7 +240,7 @@ function startSequential(){
     stopReading();
     mode = "seq";
     playing = true;
-    // if we stopped mid-stream, seqIndex should be currentIndex+1 else start 0
+    // resume from next item after currently highlighted (ensures not repeating same)
     seqIndex = (currentIndex >= 0) ? currentIndex + 1 : 0;
     if(seqIndex < SHLOKAS.length){
         let i = seqIndex;
@@ -273,7 +273,7 @@ function nextButton(){
     mode = "seq";
     playing = true;
 
-    // compute next index: if there's a highlighted index use that+1, else use currentIndex+1
+    // compute next index: highlighted+1 or currentIndex+1
     let highlighted = -1;
     document.querySelectorAll('.frame').forEach(function(f){
         if(f.classList.contains('highlight')){
@@ -287,7 +287,7 @@ function nextButton(){
         return;
     }
 
-    seqIndex = startIdx + 1; // we'll set seqIndex to next after the one we will play now
+    seqIndex = startIdx + 1; // set seqIndex for subsequent items
     let i = startIdx;
     page = Math.floor(i / PER_PAGE);
     render();
@@ -362,7 +362,7 @@ function resumeReading(){
     if(playing) return; // already playing
     // resume depending on mode
     if(mode === "seq"){
-        // ensure seqIndex is at least currentIndex+1
+        // ensure we resume from next item after currentIndex
         seqIndex = Math.max(seqIndex, (currentIndex >= 0 ? currentIndex + 1 : 0));
         if(seqIndex < SHLOKAS.length){
             playing = true;
@@ -443,6 +443,7 @@ function renderVoiceControls(){
         selectedGender = "female";
         localStorage.setItem("gita_voice_gender","female");
         try { if(typeof Android !== "undefined" && Android && Android.setVoice) Android.setVoice("female"); } catch(e){}
+        try { if(typeof Android !== "undefined" && Android && Android.setSpeed) Android.setSpeed(selectedSpeed); } catch(e){}
         loadBrowserVoices();
         renderVoiceControls();
     };
@@ -455,6 +456,7 @@ function renderVoiceControls(){
         selectedGender = "male";
         localStorage.setItem("gita_voice_gender","male");
         try { if(typeof Android !== "undefined" && Android && Android.setVoice) Android.setVoice("male"); } catch(e){}
+        try { if(typeof Android !== "undefined" && Android && Android.setSpeed) Android.setSpeed(selectedSpeed); } catch(e){}
         loadBrowserVoices();
         renderVoiceControls();
     };
