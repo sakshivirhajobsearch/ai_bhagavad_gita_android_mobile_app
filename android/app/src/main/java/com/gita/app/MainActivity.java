@@ -1,17 +1,16 @@
 package com.gita.app;
 
-import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
+import android.speech.tts.UtteranceProgressListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -20,30 +19,44 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private TextToSpeech tts;
     private boolean ttsReady = false;
+
     private String pendingText = null;
     private String pendingGender = "female";
-    private String pendingSpeed = "slow";
+    private String pendingSpeed  = "slow";
+
+    // FULL male voice pattern list
+    private final Set<String> MALE_PATTERNS = new HashSet<>(Arrays.asList(
+            "male", "mal", "man", "m1", "m2",
+            "hi-in-standard-b", "hi-in-standard-d", "hi-in-standard-e",
+            "hi-in-wavenet-b", "hi-in-wavenet-d", "hi-in-wavenet-e",
+            "google_hindi_male", "google-hindi-male", "hindi-male",
+            "hi-in-x-hid-m", "hi-in-x-hia-m",
+            "x-hid-local", "x-hid-network",
+            "x-hia-local", "x-hia-network"
+    ));
+
+    private final Set<String> FEMALE_PATTERNS = new HashSet<>(Arrays.asList(
+            "female", "fem", "woman", "w1", "w2",
+            "hi-in-standard-a", "hi-in-standard-c"
+    ));
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
 
         webView = new WebView(this);
         setContentView(webView);
 
         webView.getSettings().setJavaScriptEnabled(true);
         webView.setWebViewClient(new WebViewClient());
-        webView.addJavascriptInterface(new JsBridge(), "Android");
+        webView.addJavascriptInterface(new JSBridge(), "Android");
 
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 ttsReady = true;
-                try {
-                    tts.setLanguage(new Locale("hi", "IN"));
-                } catch (Exception ignored) {}
+                try { tts.setLanguage(new Locale("hi", "IN")); } catch (Exception ignored) {}
 
-                // default pitch/voice
-                applyVoiceAndPitch("female");
+                setVoiceInternal("female");
 
                 if (pendingText != null) {
                     speakInternal(pendingText, pendingGender, pendingSpeed);
@@ -55,94 +68,32 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/html/gita_shlokas.html");
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        try {
-            if (tts != null) {
-                tts.stop();
-                tts.shutdown();
-            }
-        } catch (Exception ignored) {}
-    }
 
-    private Voice findVoiceByGender(String gender) {
-        if (tts == null) return null;
-        try {
-            Set<Voice> voices = tts.getVoices();
-            if (voices == null) return null;
-
-            // 1) prefer hi-IN locale voices and names indicating male/female
-            for (Voice v : voices) {
-                Locale loc = v.getLocale();
-                String name = v.getName().toLowerCase();
-                if (loc != null && "hi".equals(loc.getLanguage())) {
-                    if (gender.equals("male") && (name.contains("male") || name.contains("b") || name.contains("m"))) {
-                        return v;
-                    }
-                    if (gender.equals("female") && (name.contains("female") || name.contains("a") || name.contains("c"))) {
-                        return v;
-                    }
-                }
-            }
-
-            // 2) fallback: any hi locale voice
-            for (Voice v : voices) {
-                Locale loc = v.getLocale();
-                if (loc != null && "hi".equals(loc.getLanguage())) return v;
-            }
-
-            // 3) last resort: first available voice
-            for (Voice v : voices) return v;
-
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    private void applyVoiceAndPitch(String gender) {
-        try {
-            Voice v = findVoiceByGender(gender);
-            if (v != null) {
-                try { tts.setVoice(v); } catch (Exception ignored) {}
-            }
-        } catch (Exception ignored) {}
-
-        // If no explicit male voice is found, lower pitch a bit for "male" to give male-sounding result
-        try {
-            if ("male".equalsIgnoreCase(gender)) tts.setPitch(0.9f);
-            else tts.setPitch(1.05f);
-        } catch (Exception ignored) {}
-    }
-
-    private class JsBridge {
+    // ============================================================
+    // JS → Android Bridge
+    // ============================================================
+    private class JSBridge {
         @JavascriptInterface
-        public void speak(String text, String gender, String speed) {
-            speakInternal(text, gender, speed);
+        public void speak(String txt, String gender, String speed) {
+            speakInternal(txt, gender, speed);
         }
 
         @JavascriptInterface
         public void stopSpeak() {
-            try { if (tts != null) tts.stop(); } catch (Exception ignored) {}
+            try { tts.stop(); } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
         public void setVoice(String gender) {
-            try { applyVoiceAndPitch(gender); } catch (Exception ignored) {}
+            setVoiceInternal(gender);
         }
 
         @JavascriptInterface
         public void setSpeed(String speed) {
-            try {
-                float rate = 0.82f;
-                if ("very_slow".equalsIgnoreCase(speed)) rate = 0.72f;
-                else if ("medium".equalsIgnoreCase(speed)) rate = 0.95f;
-                tts.setSpeechRate(rate);
-            } catch (Exception ignored) {}
-        }
-
-        @JavascriptInterface
-        public boolean isSpeaking() {
-            try { return tts != null && tts.isSpeaking(); } catch (Exception e) { return false; }
+            float rate = speed.equals("very_slow") ? 0.72f :
+                         speed.equals("slow")      ? 0.82f :
+                                                     0.95f;
+            try { tts.setSpeechRate(rate); } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
@@ -151,46 +102,79 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ============================================================
+    // BEST Voice Selection Engine for all Android devices
+    // ============================================================
+    private void setVoiceInternal(String gender) {
+        if (tts == null) return;
+        Voice best = null;
+
+        try {
+            for (Voice v : tts.getVoices()) {
+                String n = v.getName().toLowerCase();
+
+                if (gender.equals("male")) {
+                    for (String p : MALE_PATTERNS) {
+                        if (n.contains(p)) { best = v; break; }
+                    }
+                } else {
+                    for (String p : FEMALE_PATTERNS) {
+                        if (n.contains(p)) { best = v; break; }
+                    }
+                }
+                if (best != null) break;
+            }
+
+            // fallback: ANY Hindi voice
+            if (best == null) {
+                for (Voice v : tts.getVoices()) {
+                    if (v.getLocale().getLanguage().equals("hi")) {
+                        best = v;
+                        break;
+                    }
+                }
+            }
+
+            if (best != null) tts.setVoice(best);
+
+        } catch (Exception ignored) {}
+    }
+
+    // ============================================================
+    // SPEAK ENGINE + CALLBACK
+    // ============================================================
     private void speakInternal(String text, String gender, String speed) {
         if (!ttsReady) {
-            pendingText = text;
-            pendingGender = gender == null ? "female" : gender;
-            pendingSpeed = speed == null ? "slow" : speed;
+            pendingText  = text;
+            pendingGender = gender;
+            pendingSpeed  = speed;
             return;
         }
 
-        if (gender == null) gender = "female";
-        if (speed == null) speed = "slow";
+        setVoiceInternal(gender);
 
-        // apply voice & pitch first
-        applyVoiceAndPitch(gender);
+        float rate = speed.equals("very_slow") ? 0.72f :
+                     speed.equals("slow")      ? 0.82f : 0.95f;
+        tts.setSpeechRate(rate);
 
-        // set rate
-        float rate = 0.82f;
-        if ("very_slow".equalsIgnoreCase(speed)) rate = 0.72f;
-        else if ("medium".equalsIgnoreCase(speed)) rate = 0.95f;
-        try { tts.setSpeechRate(rate); } catch (Exception ignored) {}
-
-        // Utterance listener -> call JS callback on completion
         tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-            @Override public void onStart(String utteranceId) {}
-            @Override public void onDone(String utteranceId) {
-                runOnUiThread(() -> {
-                    try {
-                        webView.evaluateJavascript("onSpeakComplete();", null);
-                    } catch (Exception ignored) {}
-                });
+            @Override public void onStart(String id) {}
+
+            @Override public void onDone(String id) {
+                runOnUiThread(() ->
+                    webView.evaluateJavascript("onSpeakComplete();", null)
+                );
             }
-            @Override public void onError(String utteranceId) {}
+
+            @Override public void onError(String id) {}
         });
 
-        try {
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "GITA_TTS");
-        } catch (Exception e) {
-            try {
-                tts.setLanguage(new Locale("hi", "IN"));
-                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "GITA_TTS");
-            } catch (Exception ignored) {}
-        }
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "UTTID");
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try { tts.stop(); tts.shutdown(); } catch (Exception ignored) {}
     }
 }
